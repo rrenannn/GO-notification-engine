@@ -115,11 +115,12 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 	return items, nil
 }
 
-const updateNotification = `-- name: UpdateNotification :exec
+const updateNotification = `-- name: UpdateNotification :one
 UPDATE notifications
 SET status = $2,
     updated_at = NOW()
 WHERE id = $1
+RETURNING id, recipient, message, channel_type, status, created_at, updated_at
 `
 
 type UpdateNotificationParams struct {
@@ -127,7 +128,17 @@ type UpdateNotificationParams struct {
 	Status string `json:"status"`
 }
 
-func (q *Queries) UpdateNotification(ctx context.Context, arg UpdateNotificationParams) error {
-	_, err := q.db.ExecContext(ctx, updateNotification, arg.ID, arg.Status)
-	return err
+func (q *Queries) UpdateNotification(ctx context.Context, arg UpdateNotificationParams) (Notification, error) {
+	row := q.db.QueryRowContext(ctx, updateNotification, arg.ID, arg.Status)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Recipient,
+		&i.Message,
+		&i.ChannelType,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
